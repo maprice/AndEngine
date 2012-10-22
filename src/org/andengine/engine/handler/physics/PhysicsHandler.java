@@ -28,6 +28,7 @@ public class PhysicsHandler extends BaseEntityUpdateHandler {
 	protected float mVelocityY = 0;
 
 	protected float mAngularVelocity = 0;
+	protected float mAngularAcceleration = 0;
 
 	// ===========================================================
 	// Constructors
@@ -114,6 +115,9 @@ public class PhysicsHandler extends BaseEntityUpdateHandler {
 		this.mAngularVelocity = pAngularVelocity;
 	}
 
+	public void setAngularAcceleration(final float pAngularAcceleration) {
+		this.mAngularAcceleration = pAngularAcceleration;
+	}
 	// ===========================================================
 	// Methods for/from SuperClass/Interfaces
 	// ===========================================================
@@ -127,6 +131,12 @@ public class PhysicsHandler extends BaseEntityUpdateHandler {
 			if(accelerationX != 0 || accelerationY != 0) {
 				this.mVelocityX += accelerationX * pSecondsElapsed;
 				this.mVelocityY += accelerationY * pSecondsElapsed;
+			}
+			
+			/* Apply angular acceleration. */
+			final float angularAcceleration = this.mAngularAcceleration;
+			if(angularAcceleration != 0) {
+				this.mAngularVelocity += angularAcceleration * pSecondsElapsed;
 			}
 
 			/* Apply angular velocity. */

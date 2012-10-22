@@ -1,8 +1,6 @@
 package org.andengine.entity.primitive;
 
 import org.andengine.engine.camera.Camera;
-import org.andengine.entity.primitive.vbo.HighPerformanceMeshVertexBufferObject;
-import org.andengine.entity.primitive.vbo.IMeshVertexBufferObject;
 import org.andengine.entity.shape.IShape;
 import org.andengine.entity.shape.RectangularShape;
 import org.andengine.entity.shape.Shape;
@@ -10,6 +8,9 @@ import org.andengine.opengl.shader.PositionColorShaderProgram;
 import org.andengine.opengl.shader.constants.ShaderProgramConstants;
 import org.andengine.opengl.util.GLState;
 import org.andengine.opengl.vbo.DrawType;
+import org.andengine.opengl.vbo.HighPerformanceVertexBufferObject;
+import org.andengine.opengl.vbo.IVertexBufferObject;
+
 import org.andengine.opengl.vbo.VertexBufferObjectManager;
 import org.andengine.opengl.vbo.attribute.VertexBufferObjectAttribute;
 import org.andengine.opengl.vbo.attribute.VertexBufferObjectAttributes;
@@ -36,9 +37,9 @@ public class Mesh extends Shape {
 	public static final int VERTEX_SIZE = 2 + 1;
 
 	public static final VertexBufferObjectAttributes VERTEXBUFFEROBJECTATTRIBUTES_DEFAULT = new VertexBufferObjectAttributesBuilder(2)
-		.add(ShaderProgramConstants.ATTRIBUTE_POSITION_LOCATION, ShaderProgramConstants.ATTRIBUTE_POSITION, 2, GLES20.GL_FLOAT, false)
-		.add(ShaderProgramConstants.ATTRIBUTE_COLOR_LOCATION, ShaderProgramConstants.ATTRIBUTE_COLOR, 4, GLES20.GL_UNSIGNED_BYTE, true)
-		.build();
+	.add(ShaderProgramConstants.ATTRIBUTE_POSITION_LOCATION, ShaderProgramConstants.ATTRIBUTE_POSITION, 2, GLES20.GL_FLOAT, false)
+	.add(ShaderProgramConstants.ATTRIBUTE_COLOR_LOCATION, ShaderProgramConstants.ATTRIBUTE_COLOR, 4, GLES20.GL_UNSIGNED_BYTE, true)
+	.build();
 
 	// ===========================================================
 	// Fields
@@ -64,6 +65,13 @@ public class Mesh extends Shape {
 	 */
 	public Mesh(final float pX, final float pY, final float[] pBufferData, final int pVertexCount, final DrawMode pDrawMode, final VertexBufferObjectManager pVertexBufferObjectManager, final DrawType pDrawType) {
 		this(pX, pY, pVertexCount, pDrawMode, new HighPerformanceMeshVertexBufferObject(pVertexBufferObjectManager, pBufferData, pVertexCount, pDrawType, true, Mesh.VERTEXBUFFEROBJECTATTRIBUTES_DEFAULT));
+	}
+	
+	/**
+	 * Uses a default {@link HighPerformanceMeshVertexBufferObject} with the {@link VertexBufferObjectAttribute}s: {@link Mesh#VERTEXBUFFEROBJECTATTRIBUTES_DEFAULT}.
+	 */
+	public Mesh(final float pX, final float pY, final float[] pVertexX, final float[] pVertexY, final DrawMode pDrawMode, final VertexBufferObjectManager pVertexBufferObjectManager, final DrawType pDrawType) {
+		this(pX, pY, pVertexX.length, pDrawMode, new HighPerformanceMeshVertexBufferObject(pVertexBufferObjectManager, buildVertexList(pVertexX, pVertexY), pVertexX.length, pDrawType, true, Mesh.VERTEXBUFFEROBJECTATTRIBUTES_DEFAULT));
 	}
 
 	public Mesh(final float pX, final float pY, final int pVertexCount, final DrawMode pDrawMode, final IMeshVertexBufferObject pMeshVertexBufferObject) {
@@ -155,7 +163,149 @@ public class Mesh extends Shape {
 	// Methods
 	// ===========================================================
 
+	protected static float[] buildVertexList(float[] pVertexX, float[] pVertexY)
+	{
+		assert( pVertexX.length == pVertexY.length );
+		
+		float[] bufferData = new float[VERTEX_SIZE * pVertexX.length];
+		updateVertexList(pVertexX, pVertexY, bufferData);
+		return bufferData;
+	}
+	
+	protected static void updateVertexList(float[] pVertexX, float[] pVertexY, float[] pBufferData)
+	{
+		for( int i = 0; i < pVertexX.length; i++)
+		{
+			pBufferData[(i * Mesh.VERTEX_SIZE) + Mesh.VERTEX_INDEX_X] = pVertexX[i];
+			pBufferData[(i * Mesh.VERTEX_SIZE) + Mesh.VERTEX_INDEX_Y] = pVertexY[i];
+		}
+	}
+	
 	// ===========================================================
 	// Inner and Anonymous Classes
 	// ===========================================================
+
+	public static interface IMeshVertexBufferObject extends IVertexBufferObject {
+		// ===========================================================
+		// Constants
+		// ===========================================================
+
+		// ===========================================================
+		// Methods
+		// ===========================================================
+
+		public float[] getBufferData();
+		public void onUpdateColor(final Mesh pMesh);
+		public void onUpdateVertices(final Mesh pMesh);
+	}
+
+	public static class HighPerformanceMeshVertexBufferObject extends HighPerformanceVertexBufferObject implements IMeshVertexBufferObject {
+		// ===========================================================
+		// Constants
+		// ===========================================================
+
+		// ===========================================================
+		// Fields
+		// ===========================================================
+
+		private final int mVertexCount;
+
+		// ===========================================================
+		// Constructors
+		// ===========================================================
+
+		public HighPerformanceMeshVertexBufferObject(final VertexBufferObjectManager pVertexBufferObjectManager, final float[] pBufferData, final int pVertexCount, final DrawType pDrawType, final boolean pAutoDispose, final VertexBufferObjectAttributes pVertexBufferObjectAttributes) {
+			super(pVertexBufferObjectManager, pBufferData, pDrawType, pAutoDispose, pVertexBufferObjectAttributes);
+
+			this.mVertexCount = pVertexCount;
+		}
+
+		// ===========================================================
+		// Getter & Setter
+		// ===========================================================
+
+		// ===========================================================
+		// Methods for/from SuperClass/Interfaces
+		// ===========================================================
+
+		@Override
+		public void onUpdateColor(final Mesh pMesh) {
+			final float[] bufferData = this.mBufferData;
+
+			final float packedColor = pMesh.getColor().getABGRPackedFloat();
+
+			for(int i = 0; i < this.mVertexCount; i++) {
+				bufferData[(i * Mesh.VERTEX_SIZE) + Mesh.COLOR_INDEX] = packedColor;
+			}
+
+			this.setDirtyOnHardware();
+		}
+
+		@Override
+		public void onUpdateVertices(final Mesh pMesh) {
+			/* Since the buffer data is managed from the caller, we just mark the buffer data as dirty. */
+
+			this.setDirtyOnHardware();
+		}
+
+		// ===========================================================
+		// Methods
+		// ===========================================================
+
+		// ===========================================================
+		// Inner and Anonymous Classes
+		// ===========================================================
+	}
+
+	public static enum DrawMode {
+		// ===========================================================
+		// Elements
+		// ===========================================================
+
+		POINTS(GLES20.GL_POINTS),
+		LINE_STRIP(GLES20.GL_LINE_STRIP),
+		LINE_LOOP(GLES20.GL_LINE_LOOP),
+		LINES(GLES20.GL_LINES),
+		TRIANGLE_STRIP(GLES20.GL_TRIANGLE_STRIP),
+		TRIANGLE_FAN(GLES20.GL_TRIANGLE_FAN),
+		TRIANGLES(GLES20.GL_TRIANGLES);
+
+		// ===========================================================
+		// Constants
+		// ===========================================================
+
+		public final int mDrawMode;
+
+		// ===========================================================
+		// Fields
+		// ===========================================================
+
+		// ===========================================================
+		// Constructors
+		// ===========================================================
+
+		private DrawMode(final int pDrawMode) {
+			this.mDrawMode = pDrawMode;
+		}
+
+		// ===========================================================
+		// Getter & Setter
+		// ===========================================================
+
+		public int getDrawMode() {
+			return this.mDrawMode;
+		}
+
+		// ===========================================================
+		// Methods for/from SuperClass/Interfaces
+		// ===========================================================
+
+		// ===========================================================
+		// Methods
+		// ===========================================================
+
+		// ===========================================================
+		// Inner and Anonymous Classes
+		// ===========================================================
+	}
 }
